@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIHubMix 图片生成器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(-45deg, #667eea, #764ba2, #f093fb, #4facfe);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+            min-height: 100vh;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="rgba(255,255,255,0.05)" d="M0,96L48,112C96,128,192,160,288,186.7C384,213,480,235,576,213.3C672,192,768,128,864,128C960,128,1056,192,1152,197.3C1248,203,1344,149,1392,122.7L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') bottom repeat-x;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.3),
+                0 0 0 1px rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            animation: fadeInUp 0.6s ease-out;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 50px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 15px;
+            font-weight: 800;
+            letter-spacing: -1px;
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header h1 span {
+            display: inline-block;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .header p {
+            opacity: 0.95;
+            font-size: 1.2em;
+            font-weight: 300;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-badges {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .badge:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .content {
+            padding: 40px;
+            background: linear-gradient(to bottom, #fafafa 0%, #ffffff 100%);
+        }
+
+        .form-group {
+            margin-bottom: 28px;
+            animation: fadeInUp 0.5s ease-out backwards;
+        }
+
+        .form-group:nth-child(1) { animation-delay: 0.1s; }
+        .form-group:nth-child(2) { animation-delay: 0.15s; }
+        .form-group:nth-child(3) { animation-delay: 0.2s; }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.95em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .form-group label::before {
+            content: '●';
+            color: #667eea;
+            font-size: 0.6em;
+        }
+
+        .form-group select,
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e8e8e8;
+            border-radius: 12px;
+            font-size: 1em;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: white;
+            font-family: inherit;
+        }
+
+        .form-group select:hover,
+        .form-group input:hover,
+        .form-group textarea:hover {
+            border-color: #d0d0d0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .form-group select:focus,
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+            transform: translateY(-1px);
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+
+        .form-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 18px 40px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.15em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
+            margin-top: 15px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn:disabled::before {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 40px;
+            display: none;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 16px;
+            margin-top: 30px;
+        }
+
+        .loading.active {
+            display: block;
+            animation: fadeInUp 0.4s ease-out;
+        }
+
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-right: 5px solid #764ba2;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading p {
+            color: #555;
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        .results {
+            margin-top: 40px;
+            display: none;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .results.active {
+            display: block;
+        }
+
+        .results h2 {
+            margin-bottom: 30px;
+            color: #2c3e50;
+            font-size: 2em;
+            font-weight: 700;
+            position: relative;
+            padding-bottom: 15px;
+        }
+
+        .results h2::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 2px;
+        }
+
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 30px;
+        }
+
+        .image-item {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: fadeInUp 0.5s ease-out backwards;
+        }
+
+        .image-item:nth-child(1) { animation-delay: 0.1s; }
+        .image-item:nth-child(2) { animation-delay: 0.2s; }
+        .image-item:nth-child(3) { animation-delay: 0.3s; }
+        .image-item:nth-child(4) { animation-delay: 0.4s; }
+
+        .image-item:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .image-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.4s ease;
+        }
+
+        .image-item:hover img {
+            transform: scale(1.05);
+        }
+
+        .image-actions {
+            padding: 20px;
+            display: flex;
+            gap: 12px;
+            background: linear-gradient(to bottom, #ffffff, #f8f9fa);
+        }
+
+        .image-actions a {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 0.9em;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .image-actions a:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .image-actions a:active {
+            transform: translateY(0);
+        }
+
+        .error {
+            background: linear-gradient(135deg, #fee 0%, #fdd 100%);
+            border: 2px solid #fcc;
+            border-left: 5px solid #e74c3c;
+            color: #c33;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 25px;
+            display: none;
+            animation: fadeInUp 0.4s ease-out;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.2);
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .error::before {
+            content: '⚠️ ';
+            font-size: 1.2em;
+            margin-right: 8px;
+        }
+
+        .info-box {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border-left: 5px solid #2196f3;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.15);
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        .info-box h3 {
+            color: #1976d2;
+            margin-bottom: 12px;
+            font-size: 1.2em;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .info-box h3::before {
+            content: '💡';
+            font-size: 1.3em;
+        }
+
+        .info-box p {
+            color: #555;
+            font-size: 0.95em;
+            line-height: 1.8;
+        }
+
+        .advanced-options {
+            border-top: 3px solid #e8e8e8;
+            margin-top: 35px;
+            padding-top: 35px;
+            position: relative;
+        }
+
+        .advanced-options::before {
+            content: '';
+            position: absolute;
+            top: -3px;
+            left: 0;
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .advanced-options h3 {
+            margin-bottom: 25px;
+            color: #2c3e50;
+            font-size: 1.5em;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .advanced-options h3::before {
+            content: '⚙️';
+            font-size: 1.1em;
+        }
+
+        .dynamic-params {
+            display: none;
+        }
+
+        .dynamic-params.active {
+            display: block;
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .header p {
+                font-size: 1em;
+            }
+
+            .content {
+                padding: 25px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .image-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .advanced-options h3 {
+                font-size: 1.3em;
+            }
+        }
+
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        /* 选择框美化 */
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23667eea' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 40px;
+        }
+
+        /* 输入框占位符 */
+        ::placeholder {
+            color: #aaa;
+            opacity: 1;
+        }
+
+        /* Checkbox 美化 */
+        input[type="checkbox"] {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #667eea;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        input[type="checkbox"]:checked {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        input[type="checkbox"]:checked::after {
+            content: '✓';
+            position: absolute;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* 工具提示 */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+
+        .tooltip::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .tooltip:hover::after {
+            opacity: 1;
+        }
+
+        /* 成功消息 */
+        .success {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border: 2px solid #c3e6cb;
+            border-left: 5px solid #28a745;
+            color: #155724;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 25px;
+            display: none;
+            animation: fadeInUp 0.4s ease-out;
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.2);
+        }
+
+        .success.active {
+            display: block;
+        }
+
+        .success::before {
+            content: '✓ ';
+            font-size: 1.2em;
+            margin-right: 8px;
+            font-weight: bold;
+        }
+
+        /* 添加页脚样式 */
+        .footer {
+            background: #f8f9fa;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #e8e8e8;
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .footer a:hover {
+            color: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><span>🎨</span> AIHubMix 图片生成器</h1>
+            <p>支持多种 AI 图像生成模型，让创意无限可能</p>
+            <div class="header-badges">
+                <span class="badge">🚀 7+ 模型供应商</span>
+                <span class="badge">⚡ 实时生成</span>
+                <span class="badge">🎯 精准控制</span>
+                <span class="badge">📱 响应式设计</span>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="info-box">
+                <h3>📋 使用说明</h3>
+                <p>选择您想要使用的模型，输入提示词，配置参数后点击生成。支持文生图、图生图、多图融合等多种模式。</p>
+            </div>
+
+            <form id="imageForm">
+                <!-- 模型选择 -->
+                <div class="form-group">
+                    <label for="modelProvider">模型供应商</label>
+                    <select id="modelProvider" required>
+                        <option value="">选择供应商...</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="google">Google Imagen</option>
+                        <option value="qianfan">Qwen (千帆)</option>
+                        <option value="doubao">Doubao (豆包)</option>
+                        <option value="bfl">Flux (黑森林)</option>
+                        <option value="qianfan-irag">iRAG (百度)</option>
+                        <option value="ideogram">Ideogram</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="model">具体模型</label>
+                    <select id="model" required disabled>
+                        <option value="">请先选择供应商...</option>
+                    </select>
+                </div>
+
+                <!-- 基础参数 -->
+                <div class="form-group">
+                    <label for="prompt">提示词 *</label>
+                    <textarea id="prompt" placeholder="描述您想要生成的图片..." required></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="referImage">参考图片 URL (可选)</label>
+                    <input type="url" id="referImage" placeholder="https://example.com/image.jpg">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="size">图片尺寸</label>
+                        <select id="size">
+                            <option value="auto">自动</option>
+                            <option value="1K">1K</option>
+                            <option value="2K">2K</option>
+                            <option value="4K">4K</option>
+                            <option value="1024x1024">1024x1024</option>
+                            <option value="512x1024">512x1024</option>
+                            <option value="768x512">768x512</option>
+                            <option value="768x1024">768x1024</option>
+                            <option value="1024x576">1024x576</option>
+                            <option value="576x1024">576x1024</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="numImages">生成数量</label>
+                        <input type="number" id="numImages" value="1" min="1" max="10">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="quality">渲染质量</label>
+                        <select id="quality">
+                            <option value="medium">中等</option>
+                            <option value="low">低</option>
+                            <option value="high">高</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 高级选项 - OpenAI -->
+                <div id="openaiParams" class="dynamic-params">
+                    <div class="advanced-options">
+                        <h3>OpenAI 高级参数</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="inputFidelity">输入保真度</label>
+                                <select id="inputFidelity">
+                                    <option value="low">低 (默认)</option>
+                                    <option value="high">高</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="moderation">内容审核</label>
+                                <select id="moderation">
+                                    <option value="auto">自动 (默认)</option>
+                                    <option value="low">宽松</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="outputFormat">输出格式</label>
+                                <select id="outputFormat">
+                                    <option value="jpeg">JPEG (默认)</option>
+                                    <option value="png">PNG</option>
+                                    <option value="webp">WebP</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高级选项 - Flux -->
+                <div id="fluxParams" class="dynamic-params">
+                    <div class="advanced-options">
+                        <h3>Flux 高级参数</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="safetyTolerance">审核宽松度 (0-5)</label>
+                                <input type="number" id="safetyTolerance" value="2" min="0" max="5">
+                            </div>
+                            <div class="form-group">
+                                <label for="aspectRatio">宽高比</label>
+                                <select id="aspectRatio">
+                                    <option value="16:9">16:9 (默认)</option>
+                                    <option value="1:1">1:1</option>
+                                    <option value="4:3">4:3</option>
+                                    <option value="2:3">2:3</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="seed">随机种子 (可选)</label>
+                                <input type="number" id="seed" placeholder="留空为随机">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="rawMode"> 启用原始模式 (更自然的视觉效果)
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高级选项 - Qwen -->
+                <div id="qwenParams" class="dynamic-params">
+                    <div class="advanced-options">
+                        <h3>Qwen 高级参数</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="qwenSeed">随机种子 (0-2147483647)</label>
+                                <input type="number" id="qwenSeed" placeholder="留空为随机" min="0" max="2147483647">
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="watermark" checked> 添加水印
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高级选项 - Doubao -->
+                <div id="doubaoParams" class="dynamic-params">
+                    <div class="advanced-options">
+                        <h3>Doubao 高级参数</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="sequentialGeneration">组图功能</label>
+                                <select id="sequentialGeneration">
+                                    <option value="disabled">禁用</option>
+                                    <option value="auto">自动</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="maxImages">最大图片数 (1-15)</label>
+                                <input type="number" id="maxImages" value="15" min="1" max="15">
+                            </div>
+                            <div class="form-group">
+                                <label for="doubaoSeed">随机种子 (-1 至 2147483647)</label>
+                                <input type="number" id="doubaoSeed" value="-1" min="-1" max="2147483647">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="doubaoWatermark" checked> 添加水印
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label for="responseFormat">返回格式</label>
+                            <select id="responseFormat">
+                                <option value="url">URL 链接</option>
+                                <option value="base64_json">Base64 编码</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 高级选项 - Ideogram -->
+                <div id="ideogramParams" class="dynamic-params">
+                    <div class="advanced-options">
+                        <h3>Ideogram 高级参数</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="renderingSpeed">渲染速度</label>
+                                <select id="renderingSpeed">
+                                    <option value="QUALITY">质量优先 (默认)</option>
+                                    <option value="SPEED">速度优先</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="ideogramAspect">宽高比</label>
+                                <select id="ideogramAspect">
+                                    <option value="2x1">2:1</option>
+                                    <option value="1x1">1:1</option>
+                                    <option value="16x9">16:9</option>
+                                    <option value="4x3">4:3</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn" id="generateBtn">🎨 生成图片</button>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>正在生成图片，请稍候...</p>
+            </div>
+
+            <div class="error" id="error"></div>
+
+            <div class="results" id="results">
+                <h2>生成结果</h2>
+                <div class="image-grid" id="imageGrid"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>
+                Powered by <a href="https://aihubmix.com" target="_blank">AIHubMix</a> | 
+                <a href="https://docs.aihubmix.com" target="_blank">查看文档</a>
+            </p>
+            <p style="margin-top: 10px; font-size: 0.85em;">
+                Made with ❤️ for AI enthusiasts
+            </p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
